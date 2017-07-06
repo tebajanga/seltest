@@ -24,16 +24,30 @@ def wait(web_opening_time=3):
 ## actual login in hockey app site
 def whatsapp_login():
 	driver.get(config['ww_url'])
-	wait(40)
+	wait(5)
 
-def do_some():
-input_box = driver.find_element(By.XPATH, '//*[@id="main"]//footer//div[contains(@class, "input")]')
+def fetch_data():
+    # Execute the SQL command
+   cursor.execute("SELECT * from inbox where id > 14")
+   # Fetch all the rows in a list of lists.
+   results = cursor.fetchall()
+   for row in results:
+      sms_id = row[0]
+      sms_type = row[1]
+      sms_sender = row[2]
+      sms_body = row[3]
+      sms_processed = row[4]
+
+      # Now print fetched result
+      print "Sending to =%s \n" % (sms_sender)
+
+      # Now sending.
+      chooseReceiver("Henry!")
 
 ### Main Method
 if __name__ == "__main__":
 	whatsapp_login()
 	wait()
-    do_some()
 
 ## Try reading data.
 try:
