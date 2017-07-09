@@ -14,7 +14,7 @@ wait = WebDriverWait(driver, 60)
  
 # Replace 'Friend's Name' with the name of your friend 
 # or the name of a group 
-target = '"255766266161"'
+target = '"+255 766 266 161"'
  
 # Replace the below string with your own message
 string = "Message - lol "
@@ -26,6 +26,6 @@ group_title.click()
 inp_xpath = '//div[@class="input"][@dir="auto"][@data-tab="1"]'
 input_box = wait.until(EC.presence_of_element_located((
     By.XPATH, inp_xpath)))
-for i in range(2):
+for i in range(1):
     input_box.send_keys(string + Keys.ENTER)
     time.sleep(1)
