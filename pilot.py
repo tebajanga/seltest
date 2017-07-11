@@ -13,10 +13,11 @@ from selenium.common.exceptions import NoSuchElementException as NoSuchElementEx
 
 import urllib.request as urllib2
 import json
+import parse
 
 config = {
     'chromedriver_path': '/usr/local/share/chromedriver',
-    'get_msg_interval': 2,  # Time (seconds). Recommended value: 5
+    'get_msg_interval': 5,  # Time (seconds). Recommended value: 5
     'colors': True,  # True/False. True prints colorful msgs in console
     'ww_url': "https://web.whatsapp.com/"
 }
@@ -72,7 +73,6 @@ try:
         action.send_keys(msg)
         action.send_keys(Keys.RETURN)
         action.perform()
-        return True
 
     def startGetMessages(driver):
         """
@@ -81,39 +81,65 @@ try:
         message_scheduler.enter(config['get_msg_interval'], 1, getMessage, (driver, message_scheduler))
         message_scheduler.run()
 
-    
     def getMessage(driver, scheduler):
         print("Getting Messages.")
 
-        # Date and Time
-        ts = time.time()
-        timestamp = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-
-        # message variables.
-        message_found = False
-        sms_id = 0
-        sms_category = ""
-        sms_type = ""
-        sms_receiver = ""
-        sms_receiver_title = ""
-        sms_body = ""
-        sms_chat_found = ""
-        sms_processed = 0
-        sms_processed_at = ""
-        sms_created_at = ""
-
         # Getting outbox message from API.
-        #raw_messages = json.loads("http://192.168.0.53/ww-api/GetMessages.php")
-        #messages = json.loads(raw_messages.decode("utf-8"))
-        #print(messages)
-
         req = urllib2.Request("http://192.168.0.53/ww-api/GetMessages.php")
         opener = urllib2.build_opener()
         f = opener.open(req)
         data = json.loads(f.read().decode('utf-8'))
 
-        message = data['messages']
-        print (message)
+        messages = data['messages']
+
+        print (messages)
+
+        if messages:
+            for i in range(len(messages)):
+                # Preparing the message.
+                sms_id = messages[i]['id']
+                sms_category = messages[i]['category']
+                sms_type = messages[i]['type']
+                sms_receiver = messages[i]['receiver'].replace("+","")
+                sms_receiver = sms_receiver.replace(" ","")
+                sms_receiver_title = messages[i]['receiver']
+                sms_body = messages[i]['body']
+                sms_chat_found = messages[i]['chat_found']
+                sms_processed = messages[i]['processed']
+                sms_processed_at = messages[i]['processed_at']
+                sms_created_at = ""
+
+                # Replying.
+                # Selecting specific chat.
+                try:
+                    print (sms_receiver)
+                    chooseReceiver(driver, sms_receiver)
+                    if sms_receiver == "255766266161":
+                        #sendMessage(driver,sms_body)
+
+                        # data to be sent to api
+                        values = {'id':sms_id,
+                        'chat_found':1,
+                        'processed':1}
+
+                        data = parse.urlencode(values).encode()
+
+                        req = urllib2.Request("http://192.168.0.53/ww-api/UpdateMessage.php",data)
+                        urllib2.urlopen(req)
+                    else:
+                        print(decorateMsg("^-- Message can be sent to this Receiver(real) but not at TRIAL.\n\n", bcolors.OKBLUE))
+                except NoSuchElementException as e:
+                    print(decorateMsg("^-- Can not find this Receiver in the chat list.\n\n", bcolors.FAIL))
+
+                except WebDriverException as e:
+                    print(decorateMsg("^-- Can not process this Receiver.\n\n", bcolors.FAIL))
+                
+                time.sleep(5)
+
+        else:
+            print("There is no any un-processed message.")
+
+        print("\n")
 
         # add the task to the scheduler again
         message_scheduler.enter(config['get_msg_interval'], 1, getMessage, (driver, scheduler,))
@@ -140,14 +166,12 @@ try:
         return curr_thread_name
     
     def chooseReceiver(driver, receiver):
-        friend_name = receiver
         input_box = driver.find_element(By.XPATH, '//*[@id="side"]//input')
         input_box.clear()
         input_box.click()
-        input_box.send_keys(friend_name)
+        input_box.send_keys(receiver)
         input_box.send_keys(Keys.RETURN)
         printThreadName(driver)
-        return True
 
     if __name__ == '__main__':
         main()
