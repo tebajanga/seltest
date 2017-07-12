@@ -13,7 +13,9 @@ from selenium.common.exceptions import NoSuchElementException as NoSuchElementEx
 
 import urllib.request as urllib2
 import json
-import parse
+
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 config = {
     'chromedriver_path': '/usr/local/share/chromedriver',
@@ -85,61 +87,56 @@ try:
         print("Getting Messages.")
 
         # Getting outbox message from API.
-        req = urllib2.Request("http://192.168.0.53/ww-api/GetMessages.php")
+        req = urllib2.Request("http://192.168.0.52:8000/outbox/")
         opener = urllib2.build_opener()
         f = opener.open(req)
         data = json.loads(f.read().decode('utf-8'))
 
-        messages = data['messages']
+        status = data['status']
 
-        print (messages)
+        if status == 200:
+            messages = data['messages']
 
-        if messages:
-            for i in range(len(messages)):
-                # Preparing the message.
-                sms_id = messages[i]['id']
-                sms_category = messages[i]['category']
-                sms_type = messages[i]['type']
-                sms_receiver = messages[i]['receiver'].replace("+","")
-                sms_receiver = sms_receiver.replace(" ","")
-                sms_receiver_title = messages[i]['receiver']
-                sms_body = messages[i]['body']
-                sms_chat_found = messages[i]['chat_found']
-                sms_processed = messages[i]['processed']
-                sms_processed_at = messages[i]['processed_at']
-                sms_created_at = ""
+            if messages:
+                for i in range(len(messages)):
+                    # Preparing the message.
+                    sms_id = messages[i]['id']
+                    sms_category = messages[i]['category']
+                    sms_type = messages[i]['mimetype']
+                    sms_receiver = messages[i]['receiver'].replace("+","")
+                    sms_receiver = sms_receiver.replace(" ","")
+                    sms_receiver_title = messages[i]['receiver']
+                    sms_body = messages[i]['body']
+                    sms_chat_found = messages[i]['chat_found']
+                    sms_processed = messages[i]['processed']
+                    sms_processed_at = messages[i]['processed_at']
+                    sms_created_at = ""
 
-                # Replying.
-                # Selecting specific chat.
-                try:
-                    print (sms_receiver)
-                    chooseReceiver(driver, sms_receiver)
-                    if sms_receiver == "255766266161":
-                        #sendMessage(driver,sms_body)
+                    # Replying.
+                    # Selecting specific chat.
+                    try:
+                        print (sms_receiver)
+                        chooseReceiver(driver, sms_receiver)
+                        sendMessage(driver,sms_body)
+                        data = {'chat_found' : '1', 'processed' : '1'}
 
-                        # data to be sent to api
-                        values = {'id':sms_id,
-                        'chat_found':1,
-                        'processed':1}
+                    except NoSuchElementException as e:
+                        data = {'chat_found' : '2', 'processed' : '0'}
+                        print(decorateMsg("^-- Can not find this Receiver in the chat list.\n\n", bcolors.FAIL))
 
-                        data = parse.urlencode(values).encode()
+                    except WebDriverException as e:
+                        data = {'chat_found' : '2', 'processed' : '0'}
+                        print(decorateMsg("^-- Can not process this Receiver.\n\n", bcolors.FAIL))
+                    
+                    # Update the message status.
+                    url = 'http://192.168.0.52:8000/outbox/' + str(sms_id)
+                    
+                    request = Request(url, urlencode(data).encode(),method='PUT')
+                    urlopen(request)
 
-                        req = urllib2.Request("http://192.168.0.53/ww-api/UpdateMessage.php",data)
-                        urllib2.urlopen(req)
-                    else:
-                        print(decorateMsg("^-- Message can be sent to this Receiver(real) but not at TRIAL.\n\n", bcolors.OKBLUE))
-                except NoSuchElementException as e:
-                    print(decorateMsg("^-- Can not find this Receiver in the chat list.\n\n", bcolors.FAIL))
-
-                except WebDriverException as e:
-                    print(decorateMsg("^-- Can not process this Receiver.\n\n", bcolors.FAIL))
-                
-                time.sleep(5)
-
+                    time.sleep(5)
         else:
-            print("There is no any un-processed message.")
-
-        print("\n")
+                print("There is no any un-processed message.\n")
 
         # add the task to the scheduler again
         message_scheduler.enter(config['get_msg_interval'], 1, getMessage, (driver, scheduler,))
